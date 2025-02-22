@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import numpy as np # type: ignore
+import numpy as np  # type: ignore
 
 
 def calculateQ(D, v):
@@ -31,10 +31,18 @@ def calculateQ(D, v):
     # dQ = np.zeros((len(v), len(D[0, :])))
     if isinstance(D, (list, np.ndarray)) and isinstance(v, (np.int64, float)):
 
+        # Aire pour chaque diamètre dans D[0, :]
         area = np.pi * 0.25 * D[0] ** 2
-        Q = area * v
-        dQ = np.pi * 0.5 * D[0] * D[1] * v
+
+        # Débits Q sans ajout d'axe supplémentaire
+        Q = area * v  # (26,) * scalaire -> (26,)
+
+        # Calcul de la variation du débit dQ
+        dQ = np.pi * 0.5 * (D[0] - D[1]) * v  # (26,) * scalaire -> (26,)
+
+        # Débit total équivalent pour la vitesse scalaire
         Q_eq = np.sum(Q)
+
         return Q, dQ, Q_eq
     else:
         raise ValueError("Inputs D and v must be numeric or array-like.")

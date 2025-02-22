@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import numpy as np
-from Velocity_driven import calculateQ, calculatePrequired, calculateReq, calculateReqError, calculateSR, calculateVisco, validateReynolds
-from tools import printTableInConsole
+from Velocity_driven import calculateQ, calculatePrequired, calculateReq, calculateReqError, calculateVisco, validateReynolds
+from Velocity_driven.calculateSR import calculateSR
+
+
+# from tools import printTableInConsole
+from tools.printTableInConsole import printTableInConsole
 
 
 def generateP(rho, v, D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_mode):
@@ -55,11 +59,17 @@ def generateP(rho, v, D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_
     print(f'Desired nozzle exit speed (mm/s) = {v:.2f}\n')
     # Flows computation
     Q, dQ, Q_eq = calculateQ.calculateQ(D, v)
+    Q = np.array(Q, ndmin=1)  # Ensures Q is at least 1D
+    D = np.array(D, ndmin=1)
+
     # Q_eq = np.sum(Q, axis=1)  # Calculation of the total equivalent flow rate
 
     if debug_mode:
         print(f'Total equivalent Q (mm³/s) = {Q_eq:.2f}')
         print('Volumetric flow rates (mm³/s):')
+        print(f"Type de Q: {type(Q)}")
+        print(f"Contenu de Q: {Q}")
+
         printTableInConsole(Q)
 
     # Shear rate computation
@@ -72,14 +82,15 @@ def generateP(rho, v, D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_
         printTableInConsole(SR)
 
     # Viscosity computation
-    eta, deta = calculateVisco(
+    eta, deta = calculateVisco.calculateVisco(
         SR, n, K, eta_inf, eta_0, tau_0, lmbda, a, debug_mode, dSR)
     if debug_mode:
         print('Viscosities (Pa.s):')
         printTableInConsole(eta)
 
     # Renolds number hypothesis validation
-    typeEcoul, Re = validateReynolds(rho, v, D, eta, debug_mode)
+    typeEcoul, Re = validateReynolds.validateReynolds(
+        rho, v, D, eta, debug_mode)
     if debug_mode:
         print('Reynold numbers:')
         printTableInConsole(Re)

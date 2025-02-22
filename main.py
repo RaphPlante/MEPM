@@ -3,7 +3,7 @@
 
 """%**************************************************************************
 % main script
-% Last updated : 2021-04-02
+% Last updated : 2025-02-20
 %**************************************************************************
 % Description : General script that talks to other scripts, queries the
 % database and interacts with the user. Also provides user feedback.
@@ -49,7 +49,7 @@ D_avg = np.array([np.mean(D[0, :]), np.mean(D[1, :])]
 L = np.array([6.5, 0.01])  # Nozzle length and error
 
 # Desired printing speed [mm/s]
-v = np.array([50, 100, 150, 200, 250])
+v = np.array([200])
 
 # Opening the material database file
 # file_path = input("Enter the path to the material database file (.xls): ")
