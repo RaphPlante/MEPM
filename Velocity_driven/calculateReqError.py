@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import numpy as np
 
 def calculateReqError(R_eq, Ri, alpha, D, L, eta, deta):
@@ -26,9 +24,9 @@ def calculateReqError(R_eq, Ri, alpha, D, L, eta, deta):
     sum_terms = np.zeros(alpha)
 
     for i in range(alpha):
-        dRi[i] = (np.pi / 128) * (np.sum(1 / Ri) ** (-2)) * np.sqrt(((D[0, i] ** 2 / (eta[i] * L[0, i])) ** 4 * (L[0, i] * deta[i]) ** 2) +
-                                                                      ((eta[i] * L[1, i]) ** 2) +
-                                                                      16 * ((eta[i] * L[0, i] * D[1, i] / D[0, i])) ** 2)
+        dRi[i] = (np.pi / 128) * (np.sum(1 / Ri) ** (-2)) * np.sqrt(((D[0,i] ** 2 / (eta[i] * L[0])) ** 4 * (L[0] * deta[i]) ** 2) +
+                                                                      ((eta[i] * L[1]) ** 2) +
+                                                                      16 * ((eta[i] * L[0] * D[1,i] / D[0,i])) ** 2)
         sum_terms[i] = (dRi[i] / Ri[i] ** 2) ** 2
 
     ReqError = R_eq ** 2 * np.sqrt(np.sum(sum_terms))

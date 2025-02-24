@@ -1,19 +1,14 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import numpy as np
 
 def validateReynolds(rho, v, D, eta, debug_mode=False):
     """
-    validateReynolds is the function used to validate whether a laminar flow
-    is occurring in the nozzles of the robot. Upon validation, the Hagen-
-    Poiseuille viscosity formulation may be used. If any of the flow rates are
-    in the transition zone or turbulent, the function returns the position of
+    validateReynolds is the function used to validate whether a laminar flow is occurring in the nozzles of the robot. Upon validation, the Hagen-
+    Poiseuille viscosity formulation may be used. If any of the flow rates are in the transition zone or turbulent, the function returns the position of
     nozzles having non-laminar flow.
 
     The output is the flow type: 0=laminar, 1=transition zone, 2=turbulent.
     pos is the position array of nozzles having non-laminar flow.
-    Function valid only for the Extended Herschell-Bulkley, Herschell-Bulkley,
-    Sisko, Ostwald-de-Waele, Bingham, and Newtonian models.
+    Function valid only for the Extended Herschell-Bulkley, Herschell-Bulkley, Sisko, Ostwald-de-Waele, Bingham, and Newtonian models.
 
     Parameters:
     rho (array-like): Density of the fluid.
@@ -30,11 +25,11 @@ def validateReynolds(rho, v, D, eta, debug_mode=False):
         %Date: June 13, 2020 - February 13, 2024
     """
 
-    if np.isscalar(rho) and np.isscalar(v) and np.isscalar(D) and np.isscalar(eta):
-        if rho == 0:
+    if np.isscalar(rho): #and np.isscalar(eta):
+        if np.any(rho == 0):
             print('Reynolds validation is skipped since rho = 0. Update material database to activate Reynolds validation.')
-            typeEcoul = 0
-            Re = np.nan
+            typeEcoul = np.full(D.shape[0], np.nan)
+            Re = np.full(D.shape[0], np.nan)
         else:
             Re = rho * v * D / eta
             Re = Re / 1e6  # To render unitless, since rho is in kg/m³ and viscosity is in Pa.s (kg/m.s)

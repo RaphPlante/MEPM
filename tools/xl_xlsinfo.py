@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import win32com.client
 
 def xl_xlsfinfo(file_name):

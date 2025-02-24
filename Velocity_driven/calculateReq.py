@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import numpy as np
 
 def calculateReq(eta, L, D):
@@ -19,9 +17,24 @@ def calculateReq(eta, L, D):
         Author: David Brzeski, Jean-François Chauvette, Raphaël Plante
             %Date: June 13, 2020 - February 13, 2024
     """
-    if isinstance(eta, (list, np.ndarray)) and isinstance(L, (list, np.ndarray)) and isinstance(D, (list, np.ndarray)):
-        Ri = (128 * L[0] * eta) / (np.pi * D[0] ** 4)
-        R_eq = 1 / np.sum(1 / Ri)
+    eta = np.array(eta)
+    L = np.array(L)
+    D = np.array(D) 
+
+    if isinstance(eta, np.ndarray) and isinstance(L, np.ndarray) and isinstance(D, np.ndarray):
+        if len(eta) != D.shape[1]:
+            raise ValueError(" Inputs eta, L and D must have the same length.")
+        if D.shape[0] != 2:
+            raise ValueError(" Input D must be a matrix with 2 columns.")
+        
+        #Extract diameters from the first column of D
+        diameters = D[0,:]
+
+        #Calculate individual hydraulic resistance for each nozzle
+        Ri = (128*L[0]*eta)/(np.pi*diameters**4)
+
+        #Calculate equivalent hydraulic resistance for nozzles in parallel
+        R_eq = 1/np.sum(1/Ri)
+
         return R_eq, Ri
-    else:
-        raise ValueError("Inputs eta, L, and D must be numeric or array-like.")
+

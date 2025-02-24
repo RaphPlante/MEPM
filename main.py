@@ -1,37 +1,37 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""
+**************************************************************************
+ main script
+ Last updated : 2025-02-24
+**************************************************************************
+ Description : General script that talks to other scripts, queries the database and interacts with the user. 
+ Also provides user feedback.
 
-"""%**************************************************************************
-% main script
-% Last updated : 2025-02-20
-%**************************************************************************
-% Description : General script that talks to other scripts, queries the
-% database and interacts with the user. Also provides user feedback.
-%
-% Instructions:
-%       This script must be used with the materialsDB.xls database.
-%       Follow the instructions in the Matlab console.
-%
-% Authors: Jean-François Chauvette, David Brzeski, Anirban, Raphaël Plante
-% Date: 2020-05-29
-%**************************************************************************"""
+ Instructions:
+       This script must be used with the materialsDB.xls database.
+       Follow the instructions in the Matlab console.
 
+ Authors: Jean-François Chauvette, David Brzeski, Anirban, Raphaël Plante
+ Date: 2020-05-29
+**************************************************************************
+"""
+
+from Velocity_driven import generateP, calculateQ
+from tools import readMaterial
 import numpy as np
 import os
+import sys
 import openpyxl
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
 import xlrd
-from tools import readMaterial
-from Velocity_driven import generateP, calculateQ
 
 
 # Constants
 P_amb = 101325  # Ambient pressure [Pa]
 alpha = 26  # Number of nozzles
 debug_mode = True
-graph_mode = 'P'  # Plotting mode
+graph_mode = 'V'  # Plotting mode
 #     P = Pressure vs. Speed
 #     V = Viscosity vs. Shear rate
 #     S = Printing Speed vs. nozzle ID number
@@ -39,20 +39,26 @@ graph_mode = 'P'  # Plotting mode
 
 
 # Nozzle geometry
-D = np.zeros((2, alpha))
-D[0, :] = np.array([0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
-                    0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
-                    0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459])
-D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
+# D = np.zeros((2, alpha))
+# D[0, :] = np.array([0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
+#                   0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
+#                   0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459])
+# D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
+
+D = np.array([[0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
+               0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
+               0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459],
+              [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
+               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]])
+D[0, 6] = 0.9*D[0, 6]
+# diameter is clogged
+
 D_avg = np.array([np.mean(D[0, :]), np.mean(D[1, :])]
                  )  # Average diameter and error
 L = np.array([6.5, 0.01])  # Nozzle length and error
 
 # Desired printing speed [mm/s]
-v = np.array([200])
-
-# Opening the material database file
-# file_path = input("Enter the path to the material database file (.xls): ")
+v = np.array([50, 100, 150, 200, 250])
 
 
 def open_material_file():
@@ -105,8 +111,8 @@ if __name__ == "__main__":
         # Assuming you have a function to read data from specific sheet
         rho, w, f, n, K, eta_inf, eta_0, tau_0, lmbda, a = readMaterial.readMaterial(
             material_file_path, material)
-
         # Process or display retrieved data (replace with your logic)
+
         print("Retrieved material properties:")
         print(f"- Density: {rho}")
         print(f"- Weight fraction: {w}")
@@ -155,7 +161,7 @@ if __name__ == "__main__":
         for i in range(len(v)):
             try:
                 newP, newEta, newSR, newQ, newdP, newdRi, newdEta, newdSR = generateP.generateP(
-                    rho, v[i], D_avg, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_mode)
+                    rho, v[i], D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_mode)
                 P[i] = newP
                 eta[i] = newEta
                 SR[i] = newSR
@@ -203,18 +209,18 @@ if __name__ == "__main__":
             plt.show()
 
         if 'S' in graph_mode:
-            # Plot printing speed vs. nozzle ID number
-            plt.plot(range(1, alpha+1), v, marker='o',
+            # Plot printing pressure vs. nozzle ID number
+            plt.plot(range(1, alpha+1), P, marker='o',
                      linestyle='--', color='r')
             plt.xlabel('Nozzle ID Number')
-            plt.ylabel('Printing Speed (mm/s)')
-            plt.title('Printing Speed vs. Nozzle ID Number')
+            plt.ylabel('Printing pressure (mm/s)')
+            plt.title('Printing pressure vs. Nozzle ID Number')
             plt.show()
 
         if 'Q' in graph_mode:
             # Plot mass flow rate vs. printing speed
             # (Assuming Q_lit is defined)
-            plt.plot(v, Q_lit, label='Literature')
+            plt.plot(v, Q, label='Literature')  # Usage of Q_lit in place of Q
             plt.xlabel('Printing Speed (mm/s)')
             plt.ylabel('Mass Flow Rate')
             plt.title('Mass Flow Rate vs. Printing Speed')

@@ -1,9 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 def calculatePrequired(R_eq, Q_eq, P_amb):
     """
-    calculatePrequired is the function used to obtain the required pressure
-    to extrude material through the equivalent flow resistance network
+    calculatePrequired is the function used to obtain the required pressure to extrude material through the equivalent flow resistance network
     characterized by the nozzles in parallel.
 
     Inputs:
