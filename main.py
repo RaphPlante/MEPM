@@ -16,7 +16,7 @@
 """
 
 from Velocity_driven import generateP, calculateQ
-from tools import readMaterial
+from tools import readMaterial, comparePlotPV, comparePlotVisco, comparePlotQ
 import numpy as np
 import os
 import sys
@@ -31,7 +31,7 @@ import xlrd
 P_amb = 101325  # Ambient pressure [Pa]
 alpha = 26  # Number of nozzles
 debug_mode = True
-graph_mode = 'V'  # Plotting mode
+graph_mode = 'S'  # Plotting mode
 #     P = Pressure vs. Speed
 #     V = Viscosity vs. Shear rate
 #     S = Printing Speed vs. nozzle ID number
@@ -39,18 +39,19 @@ graph_mode = 'V'  # Plotting mode
 
 
 # Nozzle geometry
-# D = np.zeros((2, alpha))
-# D[0, :] = np.array([0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
-#                   0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
-#                   0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459])
-# D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
+D = np.zeros((2, alpha))
+D[0, :] = np.array([0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
+                    0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
+                    0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459])
+D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
 
-D = np.array([[0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
-               0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
-               0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459],
-              [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
-               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]])
-D[0, 6] = 0.9*D[0, 6]
+# D = np.array([[0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
+#                0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
+#                0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459],
+#               [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
+#                0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]])
+# D[0, 6] = 1*D[0, 6]
+# D = np.array([[np.ones(alpha)*0.250], [np.ones(alpha)*0.001]])
 # diameter is clogged
 
 D_avg = np.array([np.mean(D[0, :]), np.mean(D[1, :])]
@@ -189,43 +190,31 @@ if __name__ == "__main__":
         #     pass
 
        # Perform plotting based on graph_mode
+
+        P = P/1000  # convert Pa to kPa and plot
+        dP = dP/1000  # convert Pa to kPa and plot
+
         if 'P' in graph_mode:
             # Plot pressure vs. printing speed
-            plt.plot(v, P, label='Pressure')
-            plt.xlabel('Printing Speed (mm/s)')
-            plt.ylabel('Pressure (kPa)')
-            plt.title('Pressure vs. Printing Speed')
-            plt.legend()
-            plt.show()
+            comparePlotPV.comparePlotPV(v, P)
 
         if 'V' in graph_mode:
             # Plot viscosity vs. shear rate for each nozzle
-            for i in range(alpha):
-                plt.plot(SR[:, i], eta[:, i], label=f'Nozzle {i+1}')
-            plt.xlabel('Shear Rate')
-            plt.ylabel('Viscosity')
-            plt.title('Viscosity vs. Shear Rate')
-            plt.legend()
-            plt.show()
+            comparePlotVisco.comparePlotVisco(np.mean(SR, 1), np.mean(eta, 1))
 
         if 'S' in graph_mode:
-            # Plot printing pressure vs. nozzle ID number
-            plt.plot(range(1, alpha+1), P, marker='o',
-                     linestyle='--', color='r')
+            # Plot printing exit velocity vs. nozzle ID number
+            v_all = [v[0]]*26
+            plt.bar(list(range(1, alpha+1)), v_all,
+                    width=0.2, color='r', linewidth=1.5)
             plt.xlabel('Nozzle ID Number')
-            plt.ylabel('Printing pressure (mm/s)')
-            plt.title('Printing pressure vs. Nozzle ID Number')
+            plt.ylabel('Nozzle exit velocity (mm/s)')
+            # plt.title('Printing pressure vs. Nozzle ID Number')
             plt.show()
 
         if 'Q' in graph_mode:
             # Plot mass flow rate vs. printing speed
-            # (Assuming Q_lit is defined)
-            plt.plot(v, Q, label='Literature')  # Usage of Q_lit in place of Q
-            plt.xlabel('Printing Speed (mm/s)')
-            plt.ylabel('Mass Flow Rate')
-            plt.title('Mass Flow Rate vs. Printing Speed')
-            plt.legend()
-            plt.show()
+            comparePlotQ.comparePlotQ(v, np.sum(Q, 1)*rho*1e-6)
 
 else:
     print("Invalid material number.")
