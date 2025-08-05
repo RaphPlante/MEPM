@@ -9,7 +9,7 @@ mepm_path = r"C:\Users\anirb\OneDrive\Desktop\Additive Nozzle Manufacturing\CODE
 sys.path.append(mepm_path)
 
 
-def generateP(rho, v, D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_mode):
+def generateP(rho, v, D, L, theta, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, Noz_type, R, mP, debug_mode):
     """
     generateP function's purpose is to regroup all the necessary function calls in order to calculate the required pressure for a given material 
     and nozzle exit velocity. It validates the Reynold numbers. Finally, it returns the required Pressure along with Viscosities and Shear rates 
@@ -48,17 +48,15 @@ def generateP(rho, v, D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_
     print(f'Desired nozzle exit speed (mm/s) = {v:.2f}\n')
 
     # Flows computation
-    Q, dQ, Q_eq = calculateQ.calculateQ(D, v)
+    Q, dQ, Q_eq = calculateQ.calculateQ(D, v, Noz_type)
 
     if debug_mode:
-        print(f'Total equivalent Q (mm³/s) = {Q_eq:.2f}')
+        print(f'Total equivalent Q (mm³/s) = {np.mean(Q_eq):.2f}')
         print('Volumetric flow rates (mm³/s):')
         printTableInConsole.printTableInConsole(Q)
 
     # Shear rate computation
-    SR, dSR = calculateSR.calculateSR(Q, D, v)
-    rabi = (3 + (1 / n)) / 4   # Weissenberg-Rabinowitsch correction
-    SR = SR * rabi
+    SR, dSR = calculateSR.calculateSR(Q, D, v, n, Noz_type)
 
     if debug_mode:
         print('Shear rates (1/s):')
@@ -83,19 +81,20 @@ def generateP(rho, v, D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_
     if typeEcoul == 0:  # Laminar flow
 
         # Equivalent flow resistance computation
-        R_eq, Ri = calculateReq.calculateReq(eta, L, D)
-        R_eq = R_eq * rabi
-        Ri = Ri * rabi
+        R_eq, Ri = calculateReq.calculateReq(
+            eta, theta, K, n, L, D, Noz_type, R)
+
         R_eq_error, dRi = calculateReqError.calculateReqError(
             R_eq, Ri, D.shape[1], D, L, eta, deta)
 
         if debug_mode:
-            print(f'Total equivalent R (Pa.s/mm³) = {R_eq:.2f}')
+            # print(f'Total equivalent R (Pa.s/mm³) = {R_eq:.2f}')
             print('Individual flow resistances (Pa.s/mm³):')
             printTableInConsole.printTableInConsole(Ri)
 
         # Required pressure computation
-        P = calculatePrequired.calculatePrequired(R_eq, Q_eq, P_amb)
+        P = calculatePrequired.calculatePrequired(
+            R_eq, Q_eq, P_amb, n, mP, Noz_type)
         dP = np.sqrt((R_eq_error * Q_eq)**2 + (R_eq * np.sum(dQ))**2)
         print(f'Required pressure (Pa) = {P:.0f}')
     else:  # Transition flow, turbulent flow or negative Reynolds

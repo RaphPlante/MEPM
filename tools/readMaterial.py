@@ -16,8 +16,10 @@ def readMaterial(file, sheet):
     tau_0 = df.iloc[7, 0]
     lmbda = df.iloc[8, 0]
     a = df.iloc[9, 0]
+    mP = df.iloc[10, 0]
+    R = df.iloc[11, 0]
 
-    return rho, w, f, n, k, eta_inf, eta_0, tau_0, lmbda, a
+    return rho, w, f, n, k, eta_inf, eta_0, tau_0, lmbda, a, mP, R
 
 
 """# Example usage:

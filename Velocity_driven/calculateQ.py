@@ -1,6 +1,7 @@
 import numpy as np
 
-def calculateQ(D, v):
+
+def calculateQ(D, v, Noz_type):
     """
     calculateQ is the function used to obtain the volumetric flow rate through several nozzles.
 
@@ -19,12 +20,12 @@ def calculateQ(D, v):
     # Ensure inputs are valid
     if D.ndim != 2:
         raise ValueError("Input array D must be 2-dimensional")
-    if not (isinstance(D, (list, np.ndarray))): #and isinstance(v, (int, float))):
+    # and isinstance(v, (int, float))):
+    if not (isinstance(D, (list, np.ndarray))):
         raise ValueError("Inputs D and v must be numeric or array-like.")
-    
+
     if isinstance(D, list):
         D = np.array(D)
-
 
     alpha = D.shape[1]
 
@@ -32,10 +33,24 @@ def calculateQ(D, v):
     Q = np.empty(alpha)
     dQ = np.empty(alpha)
 
-    for i in range(alpha):
-         area = np.pi * 0.25 * D[0,i] ** 2  # Calculate cross-sectional area of the nozzle
-         Q[i] = area * v  # Calculate flow rate for each nozzle
-         dQ[i] = np.pi * 0.5 * D[0,i] * D[1,i] * v  # Calculate change in flow rate for each nozzle
+    if Noz_type == 'tapered':
+        for i in range(alpha):
+            # Calculate cross-sectional area of the nozzle
+            area = np.pi * 0.25 * D[0, i] ** 2
+            Q[i] = area * v  # Calculate flow rate for each nozzle
+            # Calculate change in flow rate for each nozzle
+            dQ[i] = np.pi * 0.5 * D[0, i] * D[1, i] * v
 
-    Q_eq = np.sum(Q)  # Calculate the equivalent total flow rate
-    return Q, dQ, Q_eq 
+            Q_eq = Q
+
+    else:
+
+        for i in range(alpha):
+            # Calculate cross-sectional area of the nozzle
+            area = np.pi * 0.25 * D[0, i] ** 2
+            Q[i] = area * v  # Calculate flow rate for each nozzle
+            # Calculate change in flow rate for each nozzle
+            dQ[i] = np.pi * 0.5 * D[0, i] * D[1, i] * v
+            Q_eq = np.sum(Q)  # Calculate the equivalent total flow rate
+
+    return Q, dQ, Q_eq

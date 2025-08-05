@@ -16,8 +16,9 @@
 """
 
 from Velocity_driven import generateP, calculateQ
-from tools import readMaterial, comparePlotPV, comparePlotVisco, comparePlotQ
+from tools import readMaterial, comparePlotPV, comparePlotVisco, comparePlotQ, printTableInConsole
 import numpy as np
+import math
 import os
 import sys
 import openpyxl
@@ -29,6 +30,7 @@ import xlrd
 
 # Constants
 P_amb = 101325  # Ambient pressure [Pa]
+Noz_type = "cyl"  # Either tapered or cylindrical
 alpha = 26  # Number of nozzles
 debug_mode = True
 graph_mode = 'S'  # Plotting mode
@@ -39,11 +41,15 @@ graph_mode = 'S'  # Plotting mode
 
 
 # Nozzle geometry
-D = np.zeros((2, alpha))
+D = np.zeros((3, alpha))
+
+# For 26 cylindrical Multinozzle
 D[0, :] = np.array([0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
                     0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
                     0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459])
+# D[0, :] = np.ones(alpha) * 0.250
 D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
+D[2, :] = np.ones(alpha) * 3.55
 
 # D = np.array([[0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
 #                0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
@@ -56,7 +62,14 @@ D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
 
 D_avg = np.array([np.mean(D[0, :]), np.mean(D[1, :])]
                  )  # Average diameter and error
-L = np.array([6.5, 0.01])  # Nozzle length and error
+if Noz_type == "tapered":
+    L = np.array([17.25, 0.01])  # Nozzle length and error
+else:
+    L = np.array([6.5, 0.01])  # Nozzle length and error
+
+# theta is the half-cone angle of the nozzle
+angle = 5.3  # deg
+theta = math.radians(angle)  # rad
 
 # Desired printing speed [mm/s]
 v = np.array([50, 100, 150, 200, 250])
@@ -76,6 +89,7 @@ def open_material_file():
     if filepath:
         workbook = xlrd.open_workbook(filepath)
         sheet_names = workbook.sheet_names()
+        printTableInConsole.printTableInConsole(sheet_names)
         return filepath, sheet_names
     else:
         return None, None
@@ -94,11 +108,11 @@ if __name__ == "__main__":
         while True:
             try:
                 choices = [str(i) for i in range(
-                    1, len(sheet_names) + 1)]  # 1-based indexing
+                    0, len(sheet_names))]  # 1-based indexing
                 sheet_num_str = input(
-                    "Choose a material number (1-{}): ".format(len(sheet_names)))
+                    "Choose a material number (0-{}): ".format(len(sheet_names)-1))
                 # Convert to 0-based indexing for sheet access
-                sheet_num = int(sheet_num_str) - 1
+                sheet_num = int(sheet_num_str)
                 if 0 <= sheet_num < len(sheet_names):
                     material = sheet_names[sheet_num]
                     break
@@ -110,7 +124,7 @@ if __name__ == "__main__":
 
         print(f"User selected {material}")
         # Assuming you have a function to read data from specific sheet
-        rho, w, f, n, K, eta_inf, eta_0, tau_0, lmbda, a = readMaterial.readMaterial(
+        rho, w, f, n, K, eta_inf, eta_0, tau_0, lmbda, a, mP, R = readMaterial.readMaterial(
             material_file_path, material)
         # Process or display retrieved data (replace with your logic)
 
@@ -162,7 +176,7 @@ if __name__ == "__main__":
         for i in range(len(v)):
             try:
                 newP, newEta, newSR, newQ, newdP, newdRi, newdEta, newdSR = generateP.generateP(
-                    rho, v[i], D, L, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, debug_mode)
+                    rho, v[i], D, L, theta, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, Noz_type, R, mP, debug_mode)
                 P[i] = newP
                 eta[i] = newEta
                 SR[i] = newSR
@@ -204,7 +218,7 @@ if __name__ == "__main__":
 
         if 'S' in graph_mode:
             # Plot printing exit velocity vs. nozzle ID number
-            v_all = [v[0]]*26
+            v_all = [v[0]]*alpha
             plt.bar(list(range(1, alpha+1)), v_all,
                     width=0.2, color='r', linewidth=1.5)
             plt.xlabel('Nozzle ID Number')

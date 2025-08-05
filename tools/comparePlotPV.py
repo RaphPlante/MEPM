@@ -26,22 +26,22 @@ def comparePlotPV(v, P, x_lim=None, y_lim=None, dP=0, mode='default', my_plot=No
             my_plot.text(x, y, f'{y:.0f}', fontsize=12,
                          ha='left', va='top', color=red)
 
-    # Set x-axis to log scale and custom ticks
-    my_plot.set_xscale('log')
-    custom_xticks = sorted(set(v))  # Custom ticks from v data
-    my_plot.set_xticks(custom_xticks)  # Set custom ticks for x-axis
-    # Use normal formatting for x-axis ticks
-    my_plot.get_xaxis().set_major_formatter(ScalarFormatter())
-    my_plot.get_xaxis().get_major_formatter().set_scientific(
-        False)  # Turn off scientific formatting for x-axis
+    # # Set x-axis to log scale and custom ticks
+    # my_plot.set_xscale('log')
+    # custom_xticks = sorted(set(v))  # Custom ticks from v data
+    # my_plot.set_xticks(custom_xticks)  # Set custom ticks for x-axis
+    # # Use normal formatting for x-axis ticks
+    # my_plot.get_xaxis().set_major_formatter(ScalarFormatter())
+    # my_plot.get_xaxis().get_major_formatter().set_scientific(
+    #     False)  # Turn off scientific formatting for x-axis
 
-    # Set y-axis ticks with logarithmic scale, limit the number of ticks
-    my_plot.yaxis.set_major_locator(
-        MaxNLocator(nbins=len(v)+1))  # Limit y-axis ticks
-    # Use normal formatting for y-axis ticks
-    my_plot.get_yaxis().set_major_formatter(ScalarFormatter())
-    my_plot.get_yaxis().get_major_formatter().set_scientific(
-        False)  # Turn off scientific formatting for y-axis
+    # # Set y-axis ticks with logarithmic scale, limit the number of ticks
+    # my_plot.yaxis.set_major_locator(
+    #     MaxNLocator(nbins=len(v)+1))  # Limit y-axis ticks
+    # # Use normal formatting for y-axis ticks
+    # my_plot.get_yaxis().set_major_formatter(ScalarFormatter())
+    # my_plot.get_yaxis().get_major_formatter().set_scientific(
+    #     False)  # Turn off scientific formatting for y-axis
 
     # Set the labels for the axes (if necessary)
     my_plot.set_xlabel('Nozzle exit velocity [mm/s]', fontsize=12)
