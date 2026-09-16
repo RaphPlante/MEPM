@@ -1,3 +1,35 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+=============================================================================
+  FICHIER MORT, NON IMPORTABLE, NON EXECUTABLE
+=============================================================================
+
+Il importe un paquet `MEPM` qui N'EXISTE PAS dans ce depot. Toute tentative
+d'import leve ModuleNotFoundError des la premiere ligne utile. Il n'est
+couvert par AUCUN test et ne participe a AUCUN calcul.
+
+POURQUOI IL EST CONSERVE
+Il porte la BOUCLE D'ITERATION SUR LA PRESSION, dont la phase 8 aura besoin :
+imposer Delta_P, recalculer Q_i, iterer jusqu'a une variation relative
+inferieure a 1e-4.
+
+    while variation_P >= dP_crit:
+        ...
+        variation_P = abs(P_temp - P_guess) / P_guess
+        P_guess = P_temp
+
+couplee a generateVreal, qui resout le cas des buses non identiques. Voir
+notes/iteration_vitesse_reelle_phase_8.md, qui conserve generateVreal et
+signale son defaut : il applique le facteur de Rabinowitsch deux fois de plus
+que necessaire.
+
+La phase 8 doit repartir des equations 4.7 et 4.8 de Chauvette 2023, pas de ce
+fichier.
+
+Auteurs du code d'origine : Jean-Francois Chauvette, David Brzeski, Anirban,
+Raphael Plante.
+"""
 import numpy as np
 import pandas as pd
 import os
@@ -7,9 +39,6 @@ import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
 import xlrd
-
-mepm_path = r"C:\Users\anirb\OneDrive\Desktop\Additive Nozzle Manufacturing\CODE FOR MEPM"
-sys.path.append(mepm_path)
 
 from MEPM import generateP, generateVreal, calculateQ, calculatePrequired, calculateReq, calculateReqError, calculateSR, calculateVisco, validateReynolds, generateVreal 
 from tools import printTableInConsole, readMaterial

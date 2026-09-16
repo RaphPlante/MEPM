@@ -1,12 +1,29 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+=============================================================================
+  FICHIER MORT, NON IMPORTABLE, NON EXECUTABLE
+=============================================================================
+
+Il importe un paquet `MEPM` qui N'EXISTE PAS dans ce depot. Toute tentative
+d'import leve ModuleNotFoundError des la premiere ligne utile. Il n'est
+couvert par AUCUN test et ne participe a AUCUN calcul.
+
+POURQUOI IL EST CONSERVE
+Pour memoire seulement. Ebauche inachevee : generate_p et generate_vreal y
+sont des fonctions vides marquees 'Placeholder'. Aucune valeur de ce fichier
+n'a jamais ete calculee, et il ne contient aucune logique que main_iterP.py ne
+contienne deja sous une forme plus complete.
+
+Auteurs du code d'origine : Jean-Francois Chauvette, David Brzeski, Anirban,
+Raphael Plante.
+"""
 import numpy as np
 import pandas as pd
 import os
 import sys
 import tkinter as tk
 from tkinter import filedialog
-
-mepm_path = r"C:\Users\anirb\OneDrive\Desktop\Additive Nozzle Manufacturing\CODE FOR MEPM"
-sys.path.append(mepm_path)
 
 from MEPM import calculateQ, calculatePrequired, calculateReq, calculateReqError, calculateSR, calculateVisco, validateReynolds, generateVreal 
 from tools import printTableInConsole

@@ -15,16 +15,15 @@
 **************************************************************************
 """
 
-from Velocity_driven import generateP, calculateQ
+from Velocity_driven import generateP
+from Velocity_driven.modeles import (
+    deduire_mode_historique, deduire_modele_historique)
 from tools import readMaterial, comparePlotPV, comparePlotVisco, comparePlotQ, printTableInConsole
+from tools.readMaterial import INCERTITUDES_HISTORIQUES
+from tools.unites import KILO, entrees_vers_si
 import numpy as np
 import math
-import os
-import sys
-import openpyxl
 import matplotlib.pyplot as plt
-import tkinter as tk
-from tkinter import filedialog
 import xlrd
 
 
@@ -43,25 +42,10 @@ graph_mode = 'P'  # Plotting mode
 # Nozzle geometry
 D = np.zeros((3, alpha))
 
-# For 26 cylindrical Multinozzle
-# D[0, :] = np.array([0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
-#                     0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
-#                     0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459])
-D[0, :] = np.ones(alpha) * 0.450 #0.250
-D[1, :] = np.ones(alpha) * 0.001  # Error on the nozzle diameters
-D[2, :] = np.ones(alpha) * 3.55
+D[0, :] = np.ones(alpha) * 0.450   # Diamètre de sortie [mm]
+D[1, :] = np.ones(alpha) * 0.001   # Error on the nozzle diameters [mm]
+D[2, :] = np.ones(alpha) * 3.55    # Diamètre d'entrée, utilisé en conique [mm]
 
-# D = np.array([[0.257193333, 0.25623, 0.25612, 0.256406667, 0.25561, 0.25561, 0.25612, 0.255536667, 0.255376667,
-#                0.25357, 0.25459, 0.25561, 0.2551, 0.25663, 0.25459, 0.2551, 0.25255, 0.25408, 0.25357, 0.25459,
-#                0.25816, 0.25459, 0.25663, 0.25765, 0.25714, 0.25459],
-#               [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
-#                0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]])
-# D[0, 6] = 1*D[0, 6]
-# D = np.array([[np.ones(alpha)*0.250], [np.ones(alpha)*0.001]])
-# diameter is clogged
-
-D_avg = np.array([np.mean(D[0, :]), np.mean(D[1, :])]
-                 )  # Average diameter and error
 if Noz_type == "tapered":
     L = np.array([17.25, 0.01])  # Nozzle length and error
 else:
@@ -84,6 +68,12 @@ def open_material_file():
         tuple: A tuple containing the selected file path or None if cancelled,
                and a list of material sheet names (if a file was chosen).
     """
+    # Phase 1 : imports descendus au niveau de la fonction. Ils étaient la seule
+    # raison pour laquelle main.py n'était pas importable sur une machine sans
+    # tkinter. Aucun calcul n'est affecté.
+    import tkinter as tk
+    from tkinter import filedialog
+
     root = tk.Tk()
     root.withdraw()  # Hide the main window
     filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
@@ -94,6 +84,157 @@ def open_material_file():
         return filepath, sheet_names
     else:
         return None, None
+
+
+def compute_pressures(rho, v, D, L, theta, n, K, eta_0, eta_inf, tau_0, lmbda, a,
+                      P_amb, Noz_type, R, mP, alpha, debug_mode=False,
+                      modele=None, mode=None, incertitudes=None):
+    """
+    Computes overall pressure for each velocity in v and retrieves viscosity/shear rate data.
+
+    Phase 1 de la refonte : ce corps de fonction est la boucle de calcul de
+    main.py, extraite de main.py afin que le modèle soit appelable sans
+    tkinter ni saisie console.
+
+    Phase 5, défaut #9 corrigé : le déballage des sorties de generateP était
+    permuté. generateP rend (P, eta, SR, Q, deta, dP, dRi, dSR) et les
+    positions 4, 5 et 6 étaient reçues dans l'ordre dP, dRi, deta. Le champ
+    nommé dP contenait donc deta, dRi contenait dP, et deta contenait dRi.
+    Chaque champ contient désormais la grandeur que son nom annonce.
+    Toute modification de ce déballage doit mettre à jour
+    CORRESPONDANCE_COURANTE dans tests/contrat_unites.py, dans le même commit.
+
+    Unités: SI STRICT, m, Pa, s, kg. La conversion depuis les mm de saisie a
+    lieu à la frontière, dans tools.unites.entrees_vers_si, appelée par
+    executer_sur_saisie_mm juste avant cette fonction. Aucune conversion n'a
+    lieu en aval, à l'exception des conversions d'affichage et du contrat
+    d'unités de la branche empirique, documenté dans calculatePrequired.
+
+    Les libellés « Characteristic relaxation time » pour tau_0 et
+    « Pressure coefficient » pour lmbda sont hérités de la docstring d'origine
+    et sont inexacts au vu de calculateVisco et de la colonne d'unités de
+    materials.xls. Ils sont conservés tels quels ici, correction en phase 6.
+
+    Args:
+        v (numpy.ndarray): Array of desired nozzle exit speeds. [m/s]
+        rho (float): Fluid density. [kg/m^3]
+        D (numpy.ndarray): Nozzle diameter array (3 x alpha) : sortie, erreur,
+            entrée. [m]
+        L (numpy.ndarray): Nozzle length and error. [m]
+        theta (float): Half-cone angle of the nozzle. [rad]
+        n (float): Power law exponent. [-]
+        K (float): Consistency coefficient. [Pa.s^n]
+        eta_0 (float): Zero shear rate viscosity. [Pa.s]
+        eta_inf (float): Infinite shear rate viscosity. [Pa.s]
+        tau_0 (float): Characteristic relaxation time. [Pa]
+        lmbda (float): Pressure coefficient. [s]
+        a (float): Shape factor. [-]
+        P_amb (float): Ambient pressure. [Pa]
+        Noz_type (str): "tapered" ou toute autre valeur pour cylindrique.
+        R (float): Résistance ajustée empiriquement, base de matériaux.
+            Unité indéterminée, voir le facteur 10**6 de calculatePrequired.
+        mP (float): Exposant ajusté empiriquement, base de matériaux. [-]
+        alpha (int): Number of nozzles.
+        debug_mode (bool, optional): Enable debug output (defaults to False).
+        modele (str): loi rhéologique explicite, voir Velocity_driven.modeles.
+            Obligatoire. La valeur par défaut None n'existe que pour garder
+            l'ordre des arguments positionnels hérités.
+        mode (str): ANALYTIQUE ou EMPIRIQUE, voir Velocity_driven.modeles.
+            Obligatoire, même remarque.
+        incertitudes (dict): incertitudes sur les paramètres du matériau,
+            voir calculateVisco. Un dictionnaire vide annule toutes les
+            contributions.
+
+    Returns:
+        dict: dictionnaire contenant :
+            - P (numpy.ndarray): Array of calculated overall pressures. [Pa]
+            - P_kPa (numpy.ndarray): idem, divisé par 1000, tel que tracé par main.py.
+            - eta (numpy.ndarray): Array of viscosity values for each P/v combination. [Pa.s]
+            - SR (numpy.ndarray): Array of shear rate values for each P/v combination. [1/s]
+            - Q (numpy.ndarray): Array of mass flow rates for each P/v combination (optional, might depend on generateP). [m^3/s]
+            - dP (numpy.ndarray): Array of pressure derivatives (optional, might depend on generateP). Unité non homogène à des Pa, défaut #20.
+            - dP_kPa (numpy.ndarray): idem, divisé par 1000, tel que tracé par main.py.
+            - dRi (numpy.ndarray): Array of internal resistance derivatives (optional, might depend on generateP). Unité non homogène à Ri, défaut #20.
+            - deta (numpy.ndarray): Array of viscosity derivatives (optional, might depend on generateP). [Pa.s]
+            - dSR (numpy.ndarray): Array of shear rate derivatives (optional, might depend on generateP).
+
+    Authors: Jean-François Chauvette, David Brzeski, Anirban, Raphaël Plante
+    """
+    # Initialize arrays for results
+    P = np.zeros(len(v))
+    eta = np.zeros((len(v), alpha))
+    SR = np.zeros((len(v), alpha))
+    Q = np.zeros((len(v), alpha))
+    dP = np.zeros((len(v), alpha))
+    dRi = np.zeros((len(v), alpha))
+    deta = np.zeros((len(v), alpha))
+    dSR = np.zeros((len(v), alpha))
+
+    for i in range(len(v)):
+        try:
+            # Ordre de retour de generateP : P, eta, SR, Q, deta, dP, dRi, dSR.
+            newP, newEta, newSR, newQ, newdEta, newdP, newdRi, newdSR = generateP.generateP(
+                rho, v[i], D, L, theta, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, Noz_type, R, mP, debug_mode,
+                modele, mode, incertitudes)
+            P[i] = newP
+            eta[i] = newEta
+            SR[i] = newSR
+            Q[i] = newQ
+            deta[i] = newdEta
+            dP[i] = newdP
+            dRi[i] = newdRi
+            dSR[i] = newdSR
+
+        except ValueError as e:
+            if str(e) == "Pressure could not be computed due to invalid Reynolds number":
+                print(e)
+            else:
+                raise e  # Re-raise other ValueErrors
+
+    return {
+        "P": P,
+        "P_kPa": P/1000,   # convert Pa to kPa and plot
+        "eta": eta,
+        "SR": SR,
+        "Q": Q,
+        "dP": dP,
+        "dP_kPa": dP/1000,  # convert Pa to kPa and plot
+        "dRi": dRi,
+        "deta": deta,
+        "dSR": dSR,
+    }
+
+
+def executer_sur_saisie_mm(rho, v_mm, D_mm, L_mm, theta, n, K, eta_0, eta_inf,
+                           tau_0, lmbda, a, P_amb, Noz_type, R, mP, alpha,
+                           debug_mode=False, modele=None, mode=None,
+                           incertitudes=None):
+    """Frontière d'entrée du modèle : convertit la saisie en mm puis calcule.
+
+    La géométrie d'une buse se mesure en mm et une vitesse d'impression
+    s'exprime en mm/s. Le modèle, lui, travaille en SI strict. Cette fonction
+    est le seul endroit où la conversion a lieu pour le chemin interactif.
+
+    Elle existe pour être testable : appeler compute_pressures directement
+    avec des millimètres produit un résultat silencieusement faux, le nombre
+    de Reynolds étant alors un million de fois trop grand, ce qui fait basculer
+    le modèle hors du régime laminaire et renvoyer des NaN.
+
+    Args:
+        rho (float): masse volumique. [kg/m^3]
+        v_mm (numpy.ndarray): vitesses en sortie de buse. [mm/s]
+        D_mm (numpy.ndarray): tableau (3, alpha) des diamètres. [mm]
+        L_mm (numpy.ndarray): longueur de buse et son erreur. [mm]
+        theta (float): demi-angle du cône. [rad]
+        Les autres arguments sont ceux de compute_pressures, déjà en SI.
+
+    Returns:
+        dict: identique à celui de compute_pressures, en SI.
+    """
+    D_si, L_si, v_si = entrees_vers_si(D_mm, L_mm, v_mm)
+    return compute_pressures(rho, v_si, D_si, L_si, theta, n, K, eta_0,
+                             eta_inf, tau_0, lmbda, a, P_amb, Noz_type, R, mP,
+                             alpha, debug_mode, modele, mode, incertitudes)
 
 
 if __name__ == "__main__":
@@ -133,81 +274,26 @@ if __name__ == "__main__":
         print(f"- Density: {rho}")
         print(f"- Weight fraction: {w}")
         # ... (add print statements for other properties)
-        # Initialize arrays for results
-        P = np.zeros(len(v))
-        eta = np.zeros((len(v), alpha))
-        SR = np.zeros((len(v), alpha))
-        Q = np.zeros((len(v), alpha))
-        dP = np.zeros((len(v), alpha))
-        dRi = np.zeros((len(v), alpha))
-        deta = np.zeros((len(v), alpha))
-        dSR = np.zeros((len(v), alpha))
-
-    # def compute_overall_p(v, rho, D_avg, L, n, K, eta_0, eta_inf, tau_0, lambda_, a, P_amb, debug_mode=False):
-        """
-        Computes overall pressure for each velocity in v and retrieves viscosity/shear rate data.
-
-        Args:
-            v (numpy.ndarray): Array of desired nozzle exit speeds.
-            rho (float): Fluid density.
-            D_avg (float): Average nozzle diameter.
-            L (float): Nozzle length.
-            n (float): Power law exponent.
-            K (float): Consistency coefficient.
-            eta_0 (float): Zero shear rate viscosity.
-            eta_inf (float): Infinite shear rate viscosity.
-            tau_0 (float): Characteristic relaxation time.
-            lambda_ (float): Pressure coefficient.
-            a (float): Shape factor.
-            P_amb (float): Ambient pressure.
-            debug_mode (bool, optional): Enable debug output (defaults to False).
-
-        Returns:
-            tuple: Tuple containing:
-                - P (numpy.ndarray): Array of calculated overall pressures.
-                - eta (numpy.ndarray): Array of viscosity values for each P/v combination.
-                - SR (numpy.ndarray): Array of shear rate values for each P/v combination.
-                - Q (numpy.ndarray): Array of mass flow rates for each P/v combination (optional, might depend on generateP).
-                - dP (numpy.ndarray): Array of pressure derivatives (optional, might depend on generateP).
-                - dRi (numpy.ndarray): Array of internal resistance derivatives (optional, might depend on generateP).
-                - deta (numpy.ndarray): Array of viscosity derivatives (optional, might depend on generateP).
-                - dSR (numpy.ndarray): Array of shear rate derivatives (optional, might depend on generateP).
-        """
-
-        for i in range(len(v)):
-            try:
-                newP, newEta, newSR, newQ, newdP, newdRi, newdEta, newdSR = generateP.generateP(
-                    rho, v[i], D, L, theta, n, K, eta_0, eta_inf, tau_0, lmbda, a, P_amb, Noz_type, R, mP, debug_mode)
-                P[i] = newP
-                eta[i] = newEta
-                SR[i] = newSR
-                Q[i] = newQ
-                dP[i] = newdP
-                dRi[i] = newdRi
-                deta[i] = newdEta
-                dSR[i] = newdSR
-
-            except ValueError as e:
-                if str(e) == "Pressure could not be computed due to invalid Reynolds number":
-                    print(e)
-                else:
-                    raise e  # Re-raise other ValueErrors
-
-    # Return results (adjust based on generateP)
-        # return P, eta, SR, Q, dP, dRi, deta, dSR
-
-      # Compute P, eta, SR, and Q for each printing speed v
-        # for i, speed in enumerate(v):
-        #     # Compute P, eta, SR, and Q for the given speed and material properties
-        #     # (Assuming the generateP function is implemented to calculate these values)
-        #     # P[i], eta[i, :], SR[i, :], Q[i, :] = generateP(rho, speed, D_avg, L, n, K, eta_0, eta_inf, tau_0,
-        #     #                                               lambda, a, P_amb, debug_mode)
-        #     pass
+        # D, L et v sont saisis en mm plus haut dans ce fichier. La
+        # conversion vers le SI a lieu dans executer_sur_saisie_mm.
+        # Choix explicites, déduits ici de l'ancienne base materials.xls.
+        modele = deduire_modele_historique(n, K, eta_inf, eta_0, tau_0, lmbda, a)
+        mode = deduire_mode_historique(R, mP)
+        results = executer_sur_saisie_mm(rho, v, D, L, theta, n, K, eta_0,
+                                         eta_inf, tau_0, lmbda, a, P_amb,
+                                         Noz_type, R, mP, alpha, debug_mode,
+                                         modele, mode,
+                                         INCERTITUDES_HISTORIQUES)
+        P = results["P_kPa"]
+        eta = results["eta"]
+        SR = results["SR"]
+        Q = results["Q"]
+        dP = results["dP_kPa"]
+        dRi = results["dRi"]
+        deta = results["deta"]
+        dSR = results["dSR"]
 
        # Perform plotting based on graph_mode
-
-        P = P/1000  # convert Pa to kPa and plot
-        dP = dP/1000  # convert Pa to kPa and plot
 
         if 'P' in graph_mode:
             # Plot pressure vs. printing speed
@@ -229,7 +315,6 @@ if __name__ == "__main__":
 
         if 'Q' in graph_mode:
             # Plot mass flow rate vs. printing speed
-            comparePlotQ.comparePlotQ(v, np.sum(Q, 1)*rho*1e-6)
-
-else:
-    print("Invalid material number.")
+            # Frontière d'affichage : Q est en m³/s, rho en kg/m³, le tracé
+            # attend des g/s. Auparavant Q était en mm³/s, d'où le 1e-6.
+            comparePlotQ.comparePlotQ(v, np.sum(Q, 1)*rho*KILO)
